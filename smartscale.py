@@ -6,13 +6,9 @@ import time
 import bluetooth
 import sys
 import subprocess
-from ISStreamer.Streamer import Streamer
 from random import randint
 
 # --------- User Settings ---------
-BUCKET_NAME = ":apple: My Weight History"
-BUCKET_KEY = "weight11"
-ACCESS_KEY = "PLACE YOUR INITIAL STATE ACCESS KEY HERE"
 METRIC_UNITS = False
 WEIGHT_SAMPLES = 250
 THROWAWAY_SAMPLES = 75
@@ -50,7 +46,6 @@ class EventProcessor:
         self._prevWeight = 0
         self._weight = 0
         self._weightChange = 0
-        self.streamer = Streamer(bucket_name=BUCKET_NAME,bucket_key=BUCKET_KEY,access_key=ACCESS_KEY)
 
     def messageWeighFirst(self, weight, unit):
         weight = float("{0:.2f}".format(weight))
@@ -142,9 +137,7 @@ class EventProcessor:
         if (event.totalWeight > 2):
             if self._measureCnt < WEIGHT_SAMPLES:
                 if self._measureCnt == 1:
-                    print "Measuring ..."
-                    self.streamer.log("Update", "Measuring ...")
-                    self.streamer.flush()
+                    print("Measuring ...")
 
                 if METRIC_UNITS:
                     self._events[self._measureCnt] = event.totalWeight
@@ -171,13 +164,7 @@ class EventProcessor:
                             self._msg = self.messageWeighSame(self._weight, self._weightChange, self._unit)
                     else:
                         self._msg = self.messageWeighFirst(self._weight, self._unit)
-                    print self._msg
-                    self.streamer.log("Update", self._msg)
-                    tmpVar = "Weight(" + self._unit + ")"
-                    self.streamer.log(str(tmpVar), float("{0:.2f}".format(self._weight)))
-                    tmpVar = time.strftime("%x %I:%M %p")
-                    self.streamer.log("Weigh Date", tmpVar)
-                    self.streamer.flush()
+                    print(self._msg)
 
                     # Store a small history of weights and overwite any measurement less than 2 hours old (7200 seconds)
                     if self._weightCnt > 0:
@@ -198,8 +185,6 @@ class EventProcessor:
                             self._msg = "🕒 You gained " + str(self._weightChange) + " " + self._unit + " in the last " + str(timeChange) + " days!"
                         else:
                             self._msg = "🕒 You lost " + str(abs(self._weightChange)) + " " + self._unit + " in the last " + str(timeChange) + " days!"
-                        self.streamer.log("Update", self._msg)
-                        self.streamer.flush()
 
                     # Keep track of the first complete measurement
                     if not self._measured:
@@ -239,15 +224,17 @@ class Wiiboard:
         self.LED = False
         self.address = None
         self.buttonDown = False
-        for i in xrange(3):
+        for i in range(3):
             self.calibration.append([])
-            for j in xrange(4):
+            for j in range(4):
                 self.calibration[i].append(10000)  # high dummy value so events with it don't register
 
         self.status = "Disconnected"
         self.lastEvent = BoardEvent(0, 0, 0, 0, False, False)
 
         try:
+            temp = bluetooth.BluetoothSocket()
+            print(temp)
             self.receivesocket = bluetooth.BluetoothSocket(bluetooth.L2CAP)
             self.controlsocket = bluetooth.BluetoothSocket(bluetooth.L2CAP)
         except ValueError:
@@ -259,21 +246,21 @@ class Wiiboard:
     # Connect to the Wiiboard at bluetooth address <address>
     def connect(self, address):
         if address is None:
-            print "Non existant address"
+            print("Non existant address")
             return
         self.receivesocket.connect((address, 0x13))
         self.controlsocket.connect((address, 0x11))
         if self.receivesocket and self.controlsocket:
-            print "Connected to Wiiboard at address " + address
+            print("Connected to Wiiboard at address " + address)
             self.status = "Connected"
             self.address = address
             self.calibrate()
             useExt = ["00", COMMAND_REGISTER, "04", "A4", "00", "40", "00"]
             self.send(useExt)
             self.setReportingType()
-            print "Wiiboard connected"
+            print("Wiiboard connected")
         else:
-            print "Could not connect to Wiiboard at address " + address
+            print("Could not connect to Wiiboard at address " + address)
 
     def receive(self):
         while self.status == "Connected" and not self.processor.done:
@@ -292,7 +279,7 @@ class Wiiboard:
             elif intype == EXTENSION_8BYTES:
                 self.processor.mass(self.createBoardEvent(data[2:12]))
             else:
-                print "ACK to data write received"
+                print("ACK to data write received")
 
     def disconnect(self):
         if self.status == "Connected":
@@ -307,19 +294,19 @@ class Wiiboard:
             self.controlsocket.close()
         except:
             pass
-        print "WiiBoard disconnected"
+        print("WiiBoard disconnected")
 
     # Try to discover a Wiiboard
     def discover(self):
-        print "Press the red sync button on the board now"
+        print("Press the red sync button on the board now")
         address = None
         bluetoothdevices = bluetooth.discover_devices(duration=6, lookup_names=True)
         for bluetoothdevice in bluetoothdevices:
             if bluetoothdevice[1] == BLUETOOTH_NAME:
                 address = bluetoothdevice[0]
-                print "Found Wiiboard at address " + address
+                print("Found Wiiboard at address " + address)
         if address is None:
-            print "No Wiiboards discovered."
+            print("No Wiiboards discovered.")
         return address
 
     def createBoardEvent(self, bytes):
@@ -332,14 +319,14 @@ class Wiiboard:
         if state == BUTTON_DOWN_MASK:
             buttonPressed = True
             if not self.buttonDown:
-                print "Button pressed"
+                print("Button pressed")
                 self.buttonDown = True
 
         if not buttonPressed:
             if self.lastEvent.buttonPressed:
                 buttonReleased = True
                 self.buttonDown = False
-                print "Button released"
+                print("Button released")
 
         rawTR = (int(bytes[0].encode("hex"), 16) << 8) + int(bytes[1].encode("hex"), 16)
         rawBR = (int(bytes[2].encode("hex"), 16) << 8) + int(bytes[3].encode("hex"), 16)
@@ -365,6 +352,7 @@ class Wiiboard:
         elif raw > self.calibration[1][pos]:
             val = 17 + 17 * ((raw - self.calibration[1][pos]) / float((self.calibration[2][pos] - self.calibration[1][pos])))
 
+        print('val: ' + val)
         return val
 
     def getEvent(self):
@@ -376,12 +364,12 @@ class Wiiboard:
     def parseCalibrationResponse(self, bytes):
         index = 0
         if len(bytes) == 16:
-            for i in xrange(2):
-                for j in xrange(4):
+            for i in range(2):
+                for j in range(4):
                     self.calibration[i][j] = (int(bytes[index].encode("hex"), 16) << 8) + int(bytes[index + 1].encode("hex"), 16)
                     index += 2
         elif len(bytes) < 16:
-            for i in xrange(4):
+            for i in range(4):
                 self.calibration[2][i] = (int(bytes[index].encode("hex"), 16) << 8) + int(bytes[index + 1].encode("hex"), 16)
                 index += 2
 
@@ -429,7 +417,7 @@ def main():
 
     board = Wiiboard(processor)
     if len(sys.argv) == 1:
-        print "Discovering board..."
+        print("Discovering board...")
         address = board.discover()
     else:
         address = sys.argv[1]
@@ -442,7 +430,7 @@ def main():
     except:
         pass
 
-    print "Trying to connect..."
+    print("Trying to connect...")
     board.connect(address)  # The wii board must be in sync mode at this time
     board.wait(200)
     # Flash the LED so we know we can step on.
